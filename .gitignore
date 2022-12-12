@@ -6,5 +6,8 @@ include
 pyvenv.cfg
 
 photos
+photos_knn
 
+model_knn.py
 
+trained_knn_model.clf
