@@ -5,6 +5,8 @@ import os
 
 # Opens the inbuilt camera of laptop to capture video.
 cap = cv2.VideoCapture(0)
+fps = cap.get(cv2.CAP_PROP_FPS)
+print("fps: ",fps)
 num_pictures = 50
 i = 1
 wait = 0
@@ -13,8 +15,8 @@ cap.isOpened()
 print("Enter your name")
 name = input()
 
-# Print iterations progress
-
+if not os.path.exists(f'photos_knn/train/{name}'):
+	os.makedirs(f'photos_knn/train/{name}')
 
 def printProgressBar(iteration, total, prefix='', suffix='', decimals=1, length=100, fill='█', printEnd="\r"):
     """
@@ -46,18 +48,14 @@ while i <= num_pictures:
 	if ret == False:
 		break
 
-	# if wait % 5000 == 0:
-	# Save Frame by Frame into disk using imwrite method
-	if not os.path.exists(f'photos_knn/train/{name}'):
-		os.makedirs(f'photos_knn/train/{name}')
-	cv2.imwrite(f'photos_knn/train/{name}/Frame{str(i)}.jpg', frame)
+	# 30 프레임 당 하나씩 이미지 추출
+	if(int(cap.get(1)) % (fps*30) == 0):
+		# Save Frame by Frame into disk using imwrite method
+		cv2.imwrite(f'photos_knn/train/{name}/Frame{str(i)}.jpg', frame)
 
-	# print(f"Collecting data... {i}/50")
 	printProgressBar(i, num_pictures, prefix = 'Progress:', suffix = 'Complete', length = 50)
 
 	i += 1
-
-
 
 cap.release()
 cv2.destroyAllWindows()
