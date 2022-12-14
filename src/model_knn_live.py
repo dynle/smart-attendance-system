@@ -1,5 +1,5 @@
-# TODO: 아직까지 SK를 DY라고 판단하는 현상 → 학습데이터 늘리고 모델 학습
-# TODO: 만약 firebase 데이터에 변화가 있으면 clf를 다시 훈련하고, 없으면 있던 데이터 그대로 씀
+# IDEA: 아직까지 SK를 DY라고 판단하는 현상 → 학습데이터 늘리고 모델 학습
+# IDEA: 학습하기 누르면 collect한 다음 clf 모델을 다시 학습하고, 출석하기 누르면 훈련된 모델 사용해서 바로 face recognition
 
 """
 	Uses KNN classifier which is supervised machine learning
@@ -10,33 +10,35 @@ import face_recognition
 import cv2
 import numpy as np
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
+# Load the trained model
 with open("trained_knn_model.clf","rb") as f:
     knn_clf = pickle.load(f)
+font = cv2.FONT_HERSHEY_DUPLEX
 
-video_capture = cv2.VideoCapture(0)
-
+# IDEA: Get the student list from Firebase
 known_faces_names = [
 	"DY",
 	"SK",
-	"BIden"
+	"JB"
 ]
 
-# TODO: students list는 firebase에서 가져오기
-students = known_faces_names.copy()
+remaining_students = known_faces_names.copy()
 
 face_locations = []
 face_encodings = []
 face_names = []
-
+detected_list = []
+result_flag = False
 
 now = datetime.now()
 current_date = now.strftime("%Y-%m-%d")
 
-
-# Use firestore instead of saving txt file
+# IDEA: Use firestore instead of saving txt file
 f = open(current_date+'.txt','w+')
+
+
 
 def predict(rgb_small_frame, model):
 	"""
@@ -61,53 +63,95 @@ def predict(rgb_small_frame, model):
 	# predict classes and remove classification that aren't within the threshold
 	return [(pred, loc) if rec else ("unknown", loc) for pred, loc, rec in zip(model.predict(faces_encodings), face_locations, are_matches)]
 
-def show_labels(frame, predictions):
-	for name, (top, right, bottom ,left) in predictions:
-		top *= 4
-		right *= 4
-		bottom *= 4
-		left *= 4
-		
-		# Draw a box around the face
-		cv2.rectangle(frame,(left-20,top-20),(right+20,bottom+20),(0,255,0),2)
+def show_labels(frame, name, top, right, bottom ,left, rec_color):
+	top *= 4
+	right *= 4
+	bottom *= 4
+	left *= 4
+	
+	# Draw a box around the face
+	cv2.rectangle(frame,(left-20,top-20),(right+20,bottom+20),(0,255,0),2)
 
+	if name in remaining_students and "unknown":
 		# Draw a label with a name below the face
-		cv2.rectangle(frame, (left-20, bottom -15), (right+20, bottom+20), (255, 0, 0), cv2.FILLED)
-		font = cv2.FONT_HERSHEY_DUPLEX
+		cv2.rectangle(frame, (left-20, bottom -15), (right+20, bottom+20), rec_color, cv2.FILLED)
 		cv2.putText(frame, name, (left -20, bottom + 15), font, 1, (255, 255, 255), 2)
 
-		if name in students:
-			students.remove(name)
-			print("left students: ",students)
-			current_time = now.strftime("%H:%M:%S")
-				# Save it to the firestore
-			f.write(f'{name} {current_time}\n')
-			print(f'{name} attended: {current_time}')
+def take_attendance(name):
+	remaining_students.remove(name)
+	print("left remaining_students: ",remaining_students)
+	current_time = now.strftime("%H:%M:%S")
+	# Save it to the firestore
+	f.write(f'{name} {current_time}\n')
+	print(f'{name} attended: {current_time}')
 
 
-if not video_capture.isOpened():
-	print('Failed to open camera')
-else:
-	while True:
-		_,frame = video_capture.read()
-		# Resize frame of video to 1/4 size for faster face recognition processing
-		small_frame = cv2.resize(frame,(0,0),fx=0.25,fy=0.25)
-		# Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-		rgb_small_frame = small_frame[:,:,::-1]
 
-		predictions = predict(rgb_small_frame,model=knn_clf)
+if __name__ == "__main__":
+	video_capture = cv2.VideoCapture(0)
 
-		# Print results on the console
-		for name, (top, right, bottom, left) in predictions:
-			print("- Found {} at ({}, {})".format(name, left, top))
-		
-		# Display results overlaid on frame in real-time
-		show_labels(frame, predictions)
+	frame_width = video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)
+	frame_height = video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
-		cv2.imshow("attendance system",frame)
-		if cv2.waitKey(1) & 0xFF == ord('q'):
-			break
+	if not video_capture.isOpened():
+		print('Failed to open camera')
+	else:
+		while True:
+			_,frame = video_capture.read()
+			# Resize frame of video to 1/4 size for faster face recognition processing
+			small_frame = cv2.resize(frame,(0,0),fx=0.25,fy=0.25)
+			# Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
+			rgb_small_frame = small_frame[:,:,::-1]
 
-	video_capture.release()
-	cv2.destroyAllWindows()
-	f.close()
+			if result_flag:
+				if (result_end_time - datetime.now()).total_seconds() > 0:
+					cv2.rectangle(frame, (int(frame_width/4), int(frame_height/10)), (int(frame_width*3/4), int((frame_height/10)*2)), (111, 191, 2), cv2.FILLED)
+					cv2.putText(frame, name, (int(frame_width/4) + 15, int(frame_height/10) + 35), font, 1, (255, 255, 255), 2)
+					cv2.putText(frame, "Successfully Attended", (int(frame_width/4) + 15, int(frame_height/10) + 65), font, 1, (255, 255, 255), 1)
+				else:
+					result_flag = False
+
+			predictions = predict(rgb_small_frame,model=knn_clf)
+
+			for name, (top, right, bottom, left) in predictions:
+				print("- Found {} at ({}, {})".format(name, left, top))
+
+				# Display results overlaid on frame in real-time
+				show_labels(frame, name, top, right, bottom, left, (255, 0, 0))
+				
+				# Save the result to detected_list and initialize the list if the result is different from the results in the list
+				if name in remaining_students:
+					if len(detected_list) == 30:
+						take_attendance(name)
+
+						result_flag = True
+						result_end_time = datetime.now() + timedelta(seconds=3)
+						
+						# IDEA: Add the name on list
+						cv2.rectangle(frame, (left*4-20, bottom*4 -15), (right*4+20, bottom*4+20), (0,255,0), cv2.FILLED)
+						cv2.putText(frame, "Attended", (left*4 -20, bottom*4 + 15), font, 1, (255, 255, 255), 2)
+
+						detected_list = []
+					elif len(detected_list) == 0 or name == detected_list[-1]:
+						detected_list.append(name)
+					elif name != detected_list[-1]:
+						detected_list = []
+				elif name == "unknown":
+					show_labels(frame, "Unknown", top, right, bottom, left, (0, 0, 255))
+					detected_list = []
+				# 최소 30프레임? loop? 동안 같은 사람이면 본인인정 → 출석
+				# TODO: 다른사람을 출석 완료된 DY로 판별했을때는 어떻게함? 지금은 attended로 나옴
+				# else:
+				# 	print("Have already been marked as attended")
+				# 	show_labels(frame, "Attended", top, right, bottom, left, (0,255,0))
+				# 	detected_list = []
+
+			cv2.imshow("attendance system",frame)
+			if cv2.waitKey(1) & 0xFF == ord('q'):
+				break
+
+
+
+		video_capture.release()
+		cv2.destroyAllWindows()
+		f.close()
