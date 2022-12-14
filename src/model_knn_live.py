@@ -10,6 +10,7 @@ import face_recognition
 import cv2
 import numpy as np
 import os
+import math
 from datetime import datetime, timedelta
 
 # Load the trained model
@@ -38,7 +39,15 @@ current_date = now.strftime("%Y-%m-%d")
 # IDEA: Use firestore instead of saving txt file
 f = open(current_date+'.txt','w+')
 
-
+def face_distance_to_conf(face_distance, face_match_threshold=0.5):
+    if face_distance > face_match_threshold:
+        range = (1.0 - face_match_threshold)
+        linear_val = (1.0 - face_distance) / (range * 2.0)
+        return linear_val
+    else:
+        range = face_match_threshold
+        linear_val = 1.0 - (face_distance / (range * 2.0))
+        return linear_val + ((1.0 - linear_val) * math.pow((linear_val - 0.5) * 2, 0.2))
 
 def predict(rgb_small_frame, model):
 	"""
@@ -55,33 +64,46 @@ def predict(rgb_small_frame, model):
 	faces_encodings = face_recognition.face_encodings(rgb_small_frame,known_face_locations=face_locations)
 
 	# use the KNN model to find the best matches for the frame face
-	closest_distances = model.kneighbors(faces_encodings,n_neighbors=1)
+	closest_distances = model.kneighbors(faces_encodings,n_neighbors=5)
+	face_distance = [closest_distances[0][i][0] for i in range(len(face_locations))][0]
+	print("face_distance: ",face_distance)
+	accuracy = face_distance_to_conf(face_distance)
+	print("acc: ",accuracy)
 	distance_threshold = 0.5
 	are_matches = [closest_distances[0][i][0] <=
 				distance_threshold for i in range(len(face_locations))]
 
 	# predict classes and remove classification that aren't within the threshold
-	return [(pred, loc) if rec else ("unknown", loc) for pred, loc, rec in zip(model.predict(faces_encodings), face_locations, are_matches)]
+	return [(pred, loc, acc) if rec else ("Unknown", loc, acc) for pred, loc, rec, acc in zip(model.predict(faces_encodings), face_locations, are_matches, [accuracy])]
 
-def show_labels(frame, name, top, right, bottom ,left, rec_color):
+def show_labels(frame, name, top, right, bottom ,left, rec_color, acc=None):
 	top *= 4
 	right *= 4
 	bottom *= 4
 	left *= 4
-	
+
 	# Draw a box around the face
 	cv2.rectangle(frame,(left-20,top-20),(right+20,bottom+20),(0,255,0),2)
 
-	if name in remaining_students and "unknown":
-		# Draw a label with a name below the face
+	# Draw a label with a name below the face
+	if name in remaining_students:
+		cv2.rectangle(frame, (left-20, bottom -15), (right+20, bottom+20), rec_color, cv2.FILLED)
+		cv2.putText(frame, f"{name} {round(acc,2)}", (left -20, bottom + 15), font, 1, (255, 255, 255), 2)
+	elif name == "Unknown":
 		cv2.rectangle(frame, (left-20, bottom -15), (right+20, bottom+20), rec_color, cv2.FILLED)
 		cv2.putText(frame, name, (left -20, bottom + 15), font, 1, (255, 255, 255), 2)
+
+	# cv2.rectangle(frame, (left-20, bottom -15), (right+20, bottom+20), rec_color, cv2.FILLED)
+	# if name in remaining_students:
+	# 	cv2.putText(frame, f"{name} {round(acc,2)}", (left -20, bottom + 15), font, 1, (255, 255, 255), 2)
+	# elif name == "unknown":
+	# 	cv2.putText(frame, name, (left -20, bottom + 15), font, 1, (255, 255, 255), 2)
 
 def take_attendance(name):
 	remaining_students.remove(name)
 	print("left remaining_students: ",remaining_students)
 	current_time = now.strftime("%H:%M:%S")
-	# Save it to the firestore
+	# IDEA: Save it to the firestore
 	f.write(f'{name} {current_time}\n')
 	print(f'{name} attended: {current_time}')
 
@@ -113,11 +135,11 @@ if __name__ == "__main__":
 
 			predictions = predict(rgb_small_frame,model=knn_clf)
 
-			for name, (top, right, bottom, left) in predictions:
+			for name, (top, right, bottom, left), acc in predictions:
 				print("- Found {} at ({}, {})".format(name, left, top))
 
 				# Display results overlaid on frame in real-time
-				show_labels(frame, name, top, right, bottom, left, (255, 0, 0))
+				show_labels(frame, name, top, right, bottom, left, (255, 0, 0), acc)
 				
 				# Save the result to detected_list and initialize the list if the result is different from the results in the list
 				if name in remaining_students:
@@ -136,7 +158,7 @@ if __name__ == "__main__":
 						detected_list.append(name)
 					elif name != detected_list[-1]:
 						detected_list = []
-				elif name == "unknown":
+				elif name == "Unknown":
 					show_labels(frame, "Unknown", top, right, bottom, left, (0, 0, 255))
 					detected_list = []
 				# 최소 30프레임? loop? 동안 같은 사람이면 본인인정 → 출석
