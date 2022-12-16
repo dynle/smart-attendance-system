@@ -4,7 +4,7 @@
 
 The objective of this project is to process live video-stream of students entering their classroom and generate the list of students attending the class with time stamp. The system is built in python using OpenCV and face_recognition library.
 
-## Built with
+## Built With
 * OpenCV
 * [face_recognition](https://github.com/ageitgey/face_recognition) Library
 
@@ -18,7 +18,7 @@ The objective of this project is to process live video-stream of students enteri
 <img width="1408" src="https://user-images.githubusercontent.com/36508771/208016235-f8eed7d7-0980-47c0-9710-fce2759d8b4d.png">
 <img width="1408" src="https://user-images.githubusercontent.com/36508771/208015867-bdc4bf1f-36a7-4ad8-a936-030665500252.png">
 
-## TODO
+## Todo
 - [ ] Detect image and video on camera to prevent proxy attendance
 - [ ] Save the train dataset, model, and attendance list to Firebase
 - [ ] Link with website
