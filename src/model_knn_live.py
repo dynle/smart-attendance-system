@@ -1,4 +1,3 @@
-# IDEA: 아직까지 SK를 DY라고 판단하는 현상 → 학습데이터 늘리고 모델 학습
 # IDEA: 학습하기 누르면 collect한 다음 clf 모델을 다시 학습하고, 출석하기 누르면 훈련된 모델 사용해서 바로 face recognition
 
 """
