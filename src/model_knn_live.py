@@ -13,6 +13,7 @@ import os
 import math
 from datetime import datetime, timedelta
 
+# IDEA: Get the model from firestore
 # Load the trained model
 with open("trained_knn_model.clf","rb") as f:
     knn_clf = pickle.load(f)
@@ -40,7 +41,7 @@ current_date = now.strftime("%Y-%m-%d")
 f = open(current_date+'.txt','w+')
 
 # https://github.com/ageitgey/face_recognition/wiki/Calculating-Accuracy-as-a-Percentage
-# IDEA: face_match_threshold = 0.3 when train the model with real people
+# FIXME: Possible to use face_match_threshold = 0.3 when train the model with real people
 def face_distance_to_conf(face_distance, face_match_threshold=0.4):
     if face_distance > face_match_threshold:
         range = (1.0 - face_match_threshold)
@@ -73,7 +74,8 @@ def predict(rgb_small_frame, model):
 	print("face_distance: ",face_distance)
 	accuracy = face_distance_to_conf(face_distance)
 	print("acc: ",accuracy)
-	# IDEA: distance_threshold = 0.3 when train the model with real people
+	# FIXME: Possible to use distance_threshold = 0.3 when train the model with real people
+	# Using a lower threshold than 0.6 makes the face comparison more strict.
 	distance_threshold = 0.4
 	are_matches = [closest_distances[0][i][0] <=
 				distance_threshold for i in range(len(face_locations))]
@@ -92,19 +94,11 @@ def show_labels(frame, name, top, right, bottom ,left, rec_color, acc=None):
 
 	# Draw a label with a name below the face
 	if name in remaining_students:
-		# cv2.rectangle(frame,(left-20,top-20),(right+20,bottom+20),(0,255,0),2)
 		cv2.rectangle(frame, (left-20, bottom -15), (right+20, bottom+20), rec_color, cv2.FILLED)
 		cv2.putText(frame, f"{name} {round(acc,2)}", (left -20, bottom + 15), font, 1, (255, 255, 255), 2)
 	elif name == "Unknown":
-		# cv2.rectangle(frame,(left-20,top-20),(right+20,bottom+20),(0,255,0),2)
 		cv2.rectangle(frame, (left-20, bottom -15), (right+20, bottom+20), rec_color, cv2.FILLED)
 		cv2.putText(frame, name, (left -20, bottom + 15), font, 1, (255, 255, 255), 2)
-
-	# cv2.rectangle(frame, (left-20, bottom -15), (right+20, bottom+20), rec_color, cv2.FILLED)
-	# if name in remaining_students:
-	# 	cv2.putText(frame, f"{name} {round(acc,2)}", (left -20, bottom + 15), font, 1, (255, 255, 255), 2)
-	# elif name == "unknown":
-	# 	cv2.putText(frame, name, (left -20, bottom + 15), font, 1, (255, 255, 255), 2)
 
 def take_attendance(name):
 	remaining_students.remove(name)
@@ -152,6 +146,7 @@ if __name__ == "__main__":
 				
 				# Save the result to detected_list and initialize the list if the result is different from the results in the list
 				if name in remaining_students:
+					# 최소 30프레임? loop? 동안 같은 사람이면 본인인정 → 출석
 					if len(detected_list) == 30:
 						take_attendance(name)
 
@@ -170,12 +165,6 @@ if __name__ == "__main__":
 				elif name == "Unknown":
 					show_labels(frame, "Unknown", top, right, bottom, left, (0, 0, 255))
 					detected_list = []
-				# 최소 30프레임? loop? 동안 같은 사람이면 본인인정 → 출석
-				# TODO: 다른사람을 출석 완료된 DY로 판별했을때는 어떻게함? 지금은 attended로 나옴
-				# else:
-				# 	print("Have already been marked as attended")
-				# 	show_labels(frame, "Attended", top, right, bottom, left, (0,255,0))
-				# 	detected_list = []
 
 			cv2.imshow("attendance system",frame)
 			if cv2.waitKey(1) & 0xFF == ord('q'):

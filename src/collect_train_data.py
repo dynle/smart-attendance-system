@@ -6,7 +6,6 @@ import os
 # Opens the inbuilt camera of laptop to capture video.
 cap = cv2.VideoCapture(0)
 fps = cap.get(cv2.CAP_PROP_FPS)
-print("fps: ",fps)
 num_pictures = 50
 i = 1
 wait = 0
@@ -43,14 +42,13 @@ printProgressBar(0, num_pictures, prefix = 'Progress:', suffix = 'Complete', len
 while i <= num_pictures:
 	ret, frame = cap.read()
 
-	# This condition prevents from infinite looping
-	# incase video ends.
+	# This condition prevents from infinite looping incase video ends.
 	if ret == False:
 		break
 
-	# 30 프레임 당 하나씩 이미지 추출
+	# Extract an image per 30 frames
 	if(int(cap.get(1)) % (fps*30) == 0):
-		# Save Frame by Frame into disk using imwrite method
+		# Save frame by frame into disk using imwrite method
 		cv2.imwrite(f'photos_knn/train/{name}/Frame{str(i)}.jpg', frame)
 
 	printProgressBar(i, num_pictures, prefix = 'Progress:', suffix = 'Complete', length = 50)

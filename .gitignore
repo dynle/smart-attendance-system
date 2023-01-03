@@ -10,8 +10,6 @@ photos
 photos_knn
 
 # file
-model_knn.py
 *.txt
 
 # trained model
-trained_knn_model.clf
