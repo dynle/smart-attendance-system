@@ -39,7 +39,9 @@ current_date = now.strftime("%Y-%m-%d")
 # IDEA: Use firestore instead of saving txt file
 f = open(current_date+'.txt','w+')
 
-def face_distance_to_conf(face_distance, face_match_threshold=0.5):
+# https://github.com/ageitgey/face_recognition/wiki/Calculating-Accuracy-as-a-Percentage
+# IDEA: face_match_threshold = 0.3 when train the model with real people
+def face_distance_to_conf(face_distance, face_match_threshold=0.4):
     if face_distance > face_match_threshold:
         range = (1.0 - face_match_threshold)
         linear_val = (1.0 - face_distance) / (range * 2.0)
@@ -58,6 +60,8 @@ def predict(rgb_small_frame, model):
 
 	# If no faces are found in the image, return an empty result.
 	if len(face_locations) == 0:
+		global detected_list
+		detected_list = []
 		return []
 
 	# find encodings for faces in the frame
@@ -69,7 +73,8 @@ def predict(rgb_small_frame, model):
 	print("face_distance: ",face_distance)
 	accuracy = face_distance_to_conf(face_distance)
 	print("acc: ",accuracy)
-	distance_threshold = 0.5
+	# IDEA: distance_threshold = 0.3 when train the model with real people
+	distance_threshold = 0.4
 	are_matches = [closest_distances[0][i][0] <=
 				distance_threshold for i in range(len(face_locations))]
 
@@ -87,9 +92,11 @@ def show_labels(frame, name, top, right, bottom ,left, rec_color, acc=None):
 
 	# Draw a label with a name below the face
 	if name in remaining_students:
+		# cv2.rectangle(frame,(left-20,top-20),(right+20,bottom+20),(0,255,0),2)
 		cv2.rectangle(frame, (left-20, bottom -15), (right+20, bottom+20), rec_color, cv2.FILLED)
 		cv2.putText(frame, f"{name} {round(acc,2)}", (left -20, bottom + 15), font, 1, (255, 255, 255), 2)
 	elif name == "Unknown":
+		# cv2.rectangle(frame,(left-20,top-20),(right+20,bottom+20),(0,255,0),2)
 		cv2.rectangle(frame, (left-20, bottom -15), (right+20, bottom+20), rec_color, cv2.FILLED)
 		cv2.putText(frame, name, (left -20, bottom + 15), font, 1, (255, 255, 255), 2)
 
@@ -125,6 +132,7 @@ if __name__ == "__main__":
 			# Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
 			rgb_small_frame = small_frame[:,:,::-1]
 
+			# Show a message for successful attendance 
 			if result_flag:
 				if (result_end_time - datetime.now()).total_seconds() > 0:
 					cv2.rectangle(frame, (int(frame_width/4), int(frame_height/10)), (int(frame_width*3/4), int((frame_height/10)*2)), (111, 191, 2), cv2.FILLED)
@@ -137,6 +145,7 @@ if __name__ == "__main__":
 
 			for name, (top, right, bottom, left), acc in predictions:
 				print("- Found {} at ({}, {})".format(name, left, top))
+				print(detected_list)
 
 				# Display results overlaid on frame in real-time
 				show_labels(frame, name, top, right, bottom, left, (255, 0, 0), acc)
