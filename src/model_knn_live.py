@@ -12,6 +12,24 @@ import os
 import math
 from datetime import datetime, timedelta
 
+import firebase_admin
+from firebase_admin import credentials, firestore, db
+
+cred = credentials.Certificate("./credentials/serviceAccountKey.json")
+firebase_admin.initialize_app(cred)
+
+db = firestore.client()
+
+doc_ref = db.collection(u'classA').document(u'DY')
+doc = doc_ref.get()
+if doc.exists:
+    print(f'Document data: {doc.to_dict()}')
+else:
+    print(u'No such document!')
+
+
+
+
 # IDEA: Get the model from firestore
 # Load the trained model
 with open("trained_knn_model.clf","rb") as f:
