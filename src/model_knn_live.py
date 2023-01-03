@@ -13,20 +13,47 @@ import math
 from datetime import datetime, timedelta
 
 import firebase_admin
-from firebase_admin import credentials, firestore, db
+from firebase_admin import credentials, firestore, storage
+
+font = cv2.FONT_HERSHEY_DUPLEX
+
+########################################################################
+# Firebase
 
 cred = credentials.Certificate("./credentials/serviceAccountKey.json")
-firebase_admin.initialize_app(cred)
+firebase_admin.initialize_app(cred, {
+	'storageBucket': 'smart-attendance-system-3a795.appspot.com'
+})
 
 db = firestore.client()
 
-doc_ref = db.collection(u'classA').document(u'DY')
+# Get the trained model from storage
+bucket = storage.bucket()
+blob = bucket.blob("trained_knn_model.clf")
+print(blob)
+blob.download_to_filename("model.clf")
+with open("model.clf","rb") as f:
+    knn_clf = pickle.load(f)
+
+# Get the student list from firestore
+doc_ref = db.collection(u'Mon').document(u'class1')
 doc = doc_ref.get()
 if doc.exists:
-    print(f'Document data: {doc.to_dict()}')
+	data = doc.to_dict()
+	known_faces_names = data["students"]
+	print(f'Students: {data["students"]}')
+	print(f'Participants: {data["participants"]}')
+	# print(f'Document data: {doc.to_dict()}')
 else:
-    print(u'No such document!')
+	print(u'No such document!')
 
+# Update the attended students in list (name_time format)
+doc_ref = db.collection(u'Mon').document(u'class1')
+_name = 'DY'
+now = datetime.now()
+doc_ref.update({u'participants': firestore.ArrayUnion([_name+"_"+now.strftime("%H:%M:%S")])})
+
+########################################################################
 
 
 
@@ -34,7 +61,6 @@ else:
 # Load the trained model
 with open("trained_knn_model.clf","rb") as f:
     knn_clf = pickle.load(f)
-font = cv2.FONT_HERSHEY_DUPLEX
 
 # IDEA: Get the student list from Firebase
 known_faces_names = [
