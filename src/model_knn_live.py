@@ -17,23 +17,21 @@ from firebase_admin import credentials, firestore, storage
 
 font = cv2.FONT_HERSHEY_DUPLEX
 
-########################################################################
 # Firebase
-
 cred = credentials.Certificate("./credentials/serviceAccountKey.json")
 firebase_admin.initialize_app(cred, {
 	'storageBucket': 'smart-attendance-system-3a795.appspot.com'
 })
-
 db = firestore.client()
 
-# Get the trained model from storage
+
+# Load the trained model from firebase storage
 bucket = storage.bucket()
 blob = bucket.blob("trained_knn_model.clf")
-print(blob)
-blob.download_to_filename("model.clf")
-with open("model.clf","rb") as f:
+blob.download_to_filename("model_from_fb.clf")
+with open("model_from_fb.clf","rb") as f:
     knn_clf = pickle.load(f)
+
 
 # Get the student list from firestore
 doc_ref = db.collection(u'Mon').document(u'class1')
@@ -47,28 +45,6 @@ if doc.exists:
 else:
 	print(u'No such document!')
 
-# Update the attended students in list (name_time format)
-doc_ref = db.collection(u'Mon').document(u'class1')
-_name = 'DY'
-now = datetime.now()
-doc_ref.update({u'participants': firestore.ArrayUnion([_name+"_"+now.strftime("%H:%M:%S")])})
-
-########################################################################
-
-
-
-# IDEA: Get the model from firestore
-# Load the trained model
-with open("trained_knn_model.clf","rb") as f:
-    knn_clf = pickle.load(f)
-
-# IDEA: Get the student list from Firebase
-known_faces_names = [
-	"DY",
-	"SK",
-	"JB"
-]
-
 remaining_students = known_faces_names.copy()
 
 face_locations = []
@@ -81,7 +57,7 @@ now = datetime.now()
 current_date = now.strftime("%Y-%m-%d")
 
 # IDEA: Use firestore instead of saving txt file
-f = open(current_date+'.txt','w+')
+# f = open(current_date+'.txt','w+')
 
 # https://github.com/ageitgey/face_recognition/wiki/Calculating-Accuracy-as-a-Percentage
 # FIXME: Possible to use face_match_threshold = 0.3 when train the model with real people
@@ -148,8 +124,13 @@ def take_attendance(name):
 	print("left remaining_students: ",remaining_students)
 	current_time = now.strftime("%H:%M:%S")
 	# IDEA: Save it to the firestore
-	f.write(f'{name} {current_time}\n')
+	# f.write(f'{name} {current_time}\n')
 	print(f'{name} attended: {current_time}')
+
+	# Update the attended students in list (name_time format)
+	doc_ref = db.collection(u'Mon').document(u'class1')
+	doc_ref.update({u'participants': firestore.ArrayUnion([name+"_"+current_time])})
+
 
 
 
@@ -217,4 +198,4 @@ if __name__ == "__main__":
 
 		video_capture.release()
 		cv2.destroyAllWindows()
-		f.close()
+		# f.close()
