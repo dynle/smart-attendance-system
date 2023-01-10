@@ -18,6 +18,7 @@ from firebase_admin import credentials, firestore, storage
 font = cv2.FONT_HERSHEY_DUPLEX
 
 # Firebase
+# TODO: Clear the participants list at 00:00 - https://firebase.google.com/docs/firestore/solutions/delete-collections
 cred = credentials.Certificate("./credentials/serviceAccountKey.json")
 firebase_admin.initialize_app(cred, {
 	'storageBucket': 'smart-attendance-system-3a795.appspot.com'
