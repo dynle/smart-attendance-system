@@ -17,8 +17,8 @@ from firebase_admin import credentials, firestore, storage
 
 ##############################################
 # set date and class name for test
-day = 'Mon'
-class_name = 'class1'
+day = 'Tue'
+class_name = 'class4'
 ##############################################
 
 font = cv2.FONT_HERSHEY_DUPLEX
@@ -44,16 +44,18 @@ class_ref = db.collection(day).document(class_name)
 doc = class_ref.get()
 if doc.exists:
 	student_list = doc.to_dict()['students']
+	remaining_students = student_list.copy()
 else:
 	print(u'No such document!')
 
 date_ref = db.collection(day).document(class_name).collection('history').document(today)
 doc = date_ref.get()
-if not doc.exists:
+if doc.exists:
+	remaining_students = [e for e in student_list if e not in doc.to_dict()['participants']]
+else:
 	db.collection(day).document(class_name).collection('history').document(today).set({u'participants': []})
 
 # Set variables
-remaining_students = student_list.copy()
 face_locations = []
 face_encodings = []
 face_names = []
