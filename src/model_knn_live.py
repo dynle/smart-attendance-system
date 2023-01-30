@@ -15,16 +15,22 @@ from datetime import datetime, timedelta
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 
-font = cv2.FONT_HERSHEY_DUPLEX
+##############################################
+# set date and class name for test
+day = 'Mon'
+class_name = 'class1'
+##############################################
 
-# Firebase
-# TODO: Clear the participants list at 00:00 - https://firebase.google.com/docs/firestore/solutions/delete-collections
-cred = credentials.Certificate("./credentials/serviceAccountKey.json")
+font = cv2.FONT_HERSHEY_DUPLEX
+now = datetime.now()
+today = now.strftime("%Y-%m-%d")
+
+# Firebase Initialization
+cred = credentials.Certificate('src/credentials/serviceAccountKey.json')
 firebase_admin.initialize_app(cred, {
 	'storageBucket': 'smart-attendance-system-3a795.appspot.com'
 })
 db = firestore.client()
-
 
 # Load the trained model from firebase storage
 bucket = storage.bucket()
@@ -33,32 +39,26 @@ blob.download_to_filename("model_from_fb.clf")
 with open("model_from_fb.clf","rb") as f:
     knn_clf = pickle.load(f)
 
-
-# Get the student list from firestore
-doc_ref = db.collection(u'Mon').document(u'class1')
-doc = doc_ref.get()
+# Get the student list and participants from firestore
+class_ref = db.collection(day).document(class_name)
+doc = class_ref.get()
 if doc.exists:
-	data = doc.to_dict()
-	known_faces_names = data["students"]
-	print(f'Students: {data["students"]}')
-	print(f'Participants: {data["participants"]}')
-	# print(f'Document data: {doc.to_dict()}')
+	student_list = doc.to_dict()['students']
 else:
 	print(u'No such document!')
 
-remaining_students = known_faces_names.copy()
+date_ref = db.collection(day).document(class_name).collection('history').document(today)
+doc = date_ref.get()
+if not doc.exists:
+	db.collection(day).document(class_name).collection('history').document(today).set({u'participants': []})
 
+# Set variables
+remaining_students = student_list.copy()
 face_locations = []
 face_encodings = []
 face_names = []
 detected_list = []
 result_flag = False
-
-now = datetime.now()
-current_date = now.strftime("%Y-%m-%d")
-
-# IDEA: Use firestore instead of saving txt file
-# f = open(current_date+'.txt','w+')
 
 # https://github.com/ageitgey/face_recognition/wiki/Calculating-Accuracy-as-a-Percentage
 # FIXME: Possible to use face_match_threshold = 0.3 when train the model with real people
@@ -76,7 +76,6 @@ def predict(rgb_small_frame, model):
 	"""
 	Recognizes faces in given frame using a trained KNN classifier
 	"""
-
 	face_locations = face_recognition.face_locations(rgb_small_frame)
 
 	# If no faces are found in the image, return an empty result.
@@ -124,13 +123,11 @@ def take_attendance(name):
 	remaining_students.remove(name)
 	print("left remaining_students: ",remaining_students)
 	current_time = now.strftime("%H:%M:%S")
-	# IDEA: Save it to the firestore
-	# f.write(f'{name} {current_time}\n')
 	print(f'{name} attended: {current_time}')
 
-	# Update the attended students in list (name_time format)
-	doc_ref = db.collection(u'Mon').document(u'class1')
-	doc_ref.update({u'participants': firestore.ArrayUnion([name+"_"+current_time])})
+	# Update the participants
+	date_ref.update({u'participants': firestore.ArrayUnion([name])})
+
 
 
 
