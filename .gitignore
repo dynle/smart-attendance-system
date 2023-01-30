@@ -11,5 +11,7 @@ credentials
 
 # file
 *.txt
+tempCodeRunnerFile.py
 
 # trained model
+model_from_fb.clf
