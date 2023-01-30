@@ -1,5 +1,5 @@
+# -*- coding: utf-8 -*-
 # IDEA: 학습하기 누르면 collect한 다음 clf 모델을 다시 학습하고, 출석하기 누르면 훈련된 모델 사용해서 바로 face recognition
-
 """
 	Uses KNN classifier which is supervised machine learning
 """
@@ -39,8 +39,6 @@ doc = doc_ref.get()
 if doc.exists:
 	data = doc.to_dict()
 	known_faces_names = data["students"]
-	print(f'Students: {data["students"]}')
-	print(f'Participants: {data["participants"]}')
 	# print(f'Document data: {doc.to_dict()}')
 else:
 	print(u'No such document!')
