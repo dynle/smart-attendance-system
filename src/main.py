@@ -46,7 +46,7 @@ class SelectWindow(QMainWindow, select_ui):
         if self.cmb_class.currentText() == "":
             QMessageBox.about(self, "Error", "Please select the class")
             return
-        AttendanceSystem.setClass(self.cmb_class.currentText(), self.classDocs[self.cmb_class.currentText()])
+        AttendanceSystem.setClass(self.cmb_day.currentText(), self.cmb_class.currentText(), self.classDocs[self.cmb_class.currentText()])
         AttendanceSystem.show()
         SelectWindow.hide()
 
@@ -64,19 +64,19 @@ class VideoThread(QThread):
 class AttendanceSystem(QWidget):
     def __init__(self):
         super().__init__()
-        global selectedClass
-        global selectedClassInfo
         self.setWindowTitle("Smart Attendance System 1.0")
-        self.disply_width = 640
-        self.display_height = 480
+        self.disply_width = 800
+        self.display_height = 600
         # create the label that holds the image
         self.image_label = QLabel(self)
         self.image_label.resize(self.disply_width, self.display_height)
         # create a text label
+        self.classInfo = QLabel('')
         self.textLabelName = QLabel('Name: ')
         self.textLabelStatus = QLabel('Status: ')
         # create a vertical box layout and add the two labels
         vbox = QVBoxLayout()
+        vbox.addWidget(self.classInfo)
         vbox.addWidget(self.image_label)
         vbox.addWidget(self.textLabelName)
         vbox.addWidget(self.textLabelStatus)
@@ -91,9 +91,11 @@ class AttendanceSystem(QWidget):
         # start the thread
         self.thread.start()
 
-    def setClass(self, selectedClass, selectedClassInfo):
+    def setClass(self, selectedDay, selectedClass, selectedClassInfo):
+        self.selectedDay = selectedDay
         self.selectedClass = selectedClass
         self.selectedClassInfo = selectedClassInfo
+        self.classInfo.setText(selectedClass + ' (' + selectedDay + ')')
 
     @pyqtSlot(np.ndarray)
     def update_image(self, cv_img):
