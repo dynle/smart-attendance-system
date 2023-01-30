@@ -7,8 +7,6 @@
 import pickle
 import face_recognition
 import cv2
-import numpy as np
-import os
 import math
 from datetime import datetime, timedelta
 
@@ -57,8 +55,6 @@ else:
 
 # Set variables
 face_locations = []
-face_encodings = []
-face_names = []
 detected_list = []
 result_flag = False
 
@@ -144,7 +140,7 @@ if __name__ == "__main__":
 		print('Failed to open camera')
 	else:
 		while True:
-			_,frame = video_capture.read()
+			ret,frame = video_capture.read()
 			# Resize frame of video to 1/4 size for faster face recognition processing
 			small_frame = cv2.resize(frame,(0,0),fx=0.25,fy=0.25)
 			# Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
