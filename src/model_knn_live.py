@@ -1,4 +1,3 @@
-# IDEA: 아직까지 SK를 DY라고 판단하는 현상 → 학습데이터 늘리고 모델 학습
 # IDEA: 학습하기 누르면 collect한 다음 clf 모델을 다시 학습하고, 출석하기 누르면 훈련된 모델 사용해서 바로 face recognition
 
 """
@@ -8,37 +7,56 @@
 import pickle
 import face_recognition
 import cv2
-import numpy as np
-import os
 import math
 from datetime import datetime, timedelta
 
-# IDEA: Get the model from firestore
-# Load the trained model
-with open("trained_knn_model.clf","rb") as f:
-    knn_clf = pickle.load(f)
+import firebase_admin
+from firebase_admin import credentials, firestore, storage
+
+##############################################
+# set date and class name for test
+day = 'Tue'
+class_name = 'class4'
+##############################################
+
 font = cv2.FONT_HERSHEY_DUPLEX
+now = datetime.now()
+today = now.strftime("%Y-%m-%d")
 
-# IDEA: Get the student list from Firebase
-known_faces_names = [
-	"DY",
-	"SK",
-	"JB"
-]
+# Firebase Initialization
+cred = credentials.Certificate('src/credentials/serviceAccountKey.json')
+firebase_admin.initialize_app(cred, {
+	'storageBucket': 'smart-attendance-system-3a795.appspot.com'
+})
+db = firestore.client()
 
-remaining_students = known_faces_names.copy()
+# Load the trained model from firebase storage
+bucket = storage.bucket()
+blob = bucket.blob("trained_knn_model.clf")
+blob.download_to_filename("model_from_fb.clf")
+with open("model_from_fb.clf","rb") as f:
+    knn_clf = pickle.load(f)
 
+# Get the student list and participants from firestore
+class_ref = db.collection(day).document(class_name)
+doc = class_ref.get()
+if doc.exists:
+	student_list = doc.to_dict()['students']
+	remaining_students = student_list.copy()
+else:
+	print(u'No such document!')
+
+date_ref = db.collection(day).document(class_name).collection('history').document(today)
+doc = date_ref.get()
+if doc.exists:
+	remaining_students = [e for e in student_list if e not in doc.to_dict()['participants']]
+else:
+	db.collection(day).document(class_name).collection('history').document(today).set({u'participants': []})
+
+# Set variables
 face_locations = []
-face_encodings = []
-face_names = []
 detected_list = []
 result_flag = False
-
-now = datetime.now()
-current_date = now.strftime("%Y-%m-%d")
-
-# IDEA: Use firestore instead of saving txt file
-f = open(current_date+'.txt','w+')
 
 # https://github.com/ageitgey/face_recognition/wiki/Calculating-Accuracy-as-a-Percentage
 # FIXME: Possible to use face_match_threshold = 0.3 when train the model with real people
@@ -56,7 +74,6 @@ def predict(rgb_small_frame, model):
 	"""
 	Recognizes faces in given frame using a trained KNN classifier
 	"""
-
 	face_locations = face_recognition.face_locations(rgb_small_frame)
 
 	# If no faces are found in the image, return an empty result.
@@ -104,9 +121,12 @@ def take_attendance(name):
 	remaining_students.remove(name)
 	print("left remaining_students: ",remaining_students)
 	current_time = now.strftime("%H:%M:%S")
-	# IDEA: Save it to the firestore
-	f.write(f'{name} {current_time}\n')
 	print(f'{name} attended: {current_time}')
+
+	# Update the participants
+	date_ref.update({u'participants': firestore.ArrayUnion([name])})
+
+
 
 
 
@@ -120,7 +140,7 @@ if __name__ == "__main__":
 		print('Failed to open camera')
 	else:
 		while True:
-			_,frame = video_capture.read()
+			ret,frame = video_capture.read()
 			# Resize frame of video to 1/4 size for faster face recognition processing
 			small_frame = cv2.resize(frame,(0,0),fx=0.25,fy=0.25)
 			# Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
@@ -174,4 +194,4 @@ if __name__ == "__main__":
 
 		video_capture.release()
 		cv2.destroyAllWindows()
-		f.close()
+		# f.close()

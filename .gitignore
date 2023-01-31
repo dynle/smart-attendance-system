@@ -1,4 +1,3 @@
-
 .DS_Store
 bin
 lib
@@ -8,8 +7,11 @@ pyvenv.cfg
 # data
 photos
 photos_knn
+credentials
 
 # file
 *.txt
+tempCodeRunnerFile.py
 
 # trained model
+model_from_fb.clf
