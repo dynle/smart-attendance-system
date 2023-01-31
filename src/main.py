@@ -167,7 +167,7 @@ class VideoThread(QThread):
         closest_distances = model.kneighbors(faces_encodings,n_neighbors=5)
         face_distance = [closest_distances[0][i][0] for i in range(len(self.face_locations))][0]
         accuracy = self.face_distance_to_conf(face_distance)
-        print(f"acc: {round(accuracy, 3)*100}%")
+        print(f"acc: {int(round(accuracy, 3)*100)}%")
         print()
         # Using a lower threshold than 0.6 makes the face comparison more strict.
         distance_threshold = 0.3
