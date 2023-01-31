@@ -13,20 +13,12 @@ import firebase_admin
 from firebase_admin import credentials, firestore, storage
 import face_recognition
 
-
-
-##############################################
-# set date and class name for test
-day = 'Wed'
-class_name = 'class6'
-##############################################
-
 font = cv2.FONT_HERSHEY_DUPLEX
 now = datetime.now()
 today = now.strftime("%Y-%m-%d")
 
 # Firebase Initialization
-cred = credentials.Certificate('src/credentials/serviceAccountKey.json')
+cred = credentials.Certificate('./credentials/serviceAccountKey.json')
 firebase_admin.initialize_app(cred, {
 	'storageBucket': 'smart-attendance-system-3a795.appspot.com'
 })
@@ -39,62 +31,8 @@ blob.download_to_filename("model_from_fb.clf")
 with open("model_from_fb.clf","rb") as f:
     knn_clf = pickle.load(f)
 
-# Get the student list and participants from firestore
-class_ref = db.collection(day).document(class_name)
-doc = class_ref.get()
-if doc.exists:
-	student_list = doc.to_dict()['students']
-	remaining_students = student_list.copy()
-else:
-	print(u'No such document!')
+select_ui = uic.loadUiType("./main.ui")[0]
 
-date_ref = db.collection(day).document(class_name).collection('history').document(today)
-doc = date_ref.get()
-if doc.exists:
-	remaining_students = [e for e in student_list if e not in doc.to_dict()['participants']]
-else:
-	db.collection(day).document(class_name).collection('history').document(today).set({u'participants': []})
-
-# https://github.com/ageitgey/face_recognition/wiki/Calculating-Accuracy-as-a-Percentage
-def face_distance_to_conf(face_distance, face_match_threshold=0.3):
-    if face_distance > face_match_threshold:
-        range = (1.0 - face_match_threshold)
-        linear_val = (1.0 - face_distance) / (range * 2.0)
-        return linear_val
-    else:
-        range = face_match_threshold
-        linear_val = 1.0 - (face_distance / (range * 2.0))
-        return linear_val + ((1.0 - linear_val) * math.pow((linear_val - 0.5) * 2, 0.2))
-
-def show_labels(cv_img, name, top, right, bottom ,left, rec_color, acc=None):
-	top *= 4
-	right *= 4
-	bottom *= 4
-	left *= 4
-
-	# Draw a box around the face
-	cv2.rectangle(cv_img,(left-20,top-20),(right+20,bottom+20),(0,255,0),2)
-
-	# Draw a label with a name below the face
-	if name in remaining_students:
-		cv2.rectangle(cv_img, (left-20, bottom -15), (right+20, bottom+20), rec_color, cv2.FILLED)
-		cv2.putText(cv_img, f"{name} {round(acc,2)}", (left -20, bottom + 15), font, 1, (255, 255, 255), 2)
-	elif name == "Unknown":
-		cv2.rectangle(cv_img, (left-20, bottom -15), (right+20, bottom+20), rec_color, cv2.FILLED)
-		cv2.putText(cv_img, name, (left -20, bottom + 15), font, 1, (255, 255, 255), 2)
-
-def take_attendance(name):
-	remaining_students.remove(name)
-	print("left remaining_students: ",remaining_students)
-	current_time = now.strftime("%H:%M:%S")
-	print(f'{name} attended: {current_time}')
-
-	# Update the participants
-	date_ref.update({u'participants': firestore.ArrayUnion([name])})
-
-
-
-select_ui = uic.loadUiType("src/main.ui")[0]
 
 class SelectWindow(QMainWindow, select_ui):
     def __init__(self):
@@ -131,10 +69,23 @@ class SelectWindow(QMainWindow, select_ui):
 class VideoThread(QThread):
     change_pixmap_signal = pyqtSignal(np.ndarray)
 
-    def __init__(self):
+    def __init__(self, day, class_name, student_list, labelName, labelStatus):
         super().__init__()
         self.detected_list = []
         self.face_locations = []
+        self.student_list = student_list
+        self.remaining_students = student_list.copy()
+        self.labelName = labelName
+        self.labelStatus = labelStatus
+
+        self.date_ref = db.collection(day).document(class_name).collection('history').document(today)
+        doc = self.date_ref.get()
+        self.participants_list = doc.to_dict()['participants']
+
+        if doc.exists:
+            self.remaining_students = [e for e in student_list if e not in self.participants_list]
+        else:
+            db.collection(day).document(class_name).collection('history').document(today).set({u'participants': []})
     
     def run(self):
         # capture from web cam
@@ -165,16 +116,20 @@ class VideoThread(QThread):
 
             for name, (top, right, bottom, left), acc in predictions:
                 print("- Found {} at ({}, {})".format(name, left, top))
-                # print(self.detected_list)
+                self.labelName.setText(f"Name: {name}")
+                if name in self.participants_list:
+                    self.labelStatus.setText("Status: Attended")
+                elif name not in self.student_list:
+                    self.labelStatus.setText("Status: You are not taking this class!")
 
                 # Display results overlaid on cv_img in real-time
-                show_labels(cv_img, name, top, right, bottom, left, (255, 0, 0), acc)
+                self.show_labels(cv_img, name, top, right, bottom, left, (255, 0, 0), acc)
 
                 # Save the result to detected_list and initialize the list if the result is different from the results in the list
-                if name in remaining_students:
+                if name in self.remaining_students:
                     # 최소 30프레임? loop? 동안 같은 사람이면 본인인정 → 출석
                     if len(self.detected_list) == 30:
-                        take_attendance(name)
+                        self.take_attendance(name)
 
                         result_flag = True
                         result_end_time = datetime.now() + timedelta(seconds=3)
@@ -188,7 +143,7 @@ class VideoThread(QThread):
                     elif name != self.detected_list[-1]:
                         self.detected_list = []
                 elif name == "Unknown":
-                    show_labels(cv_img, "Unknown", top, right, bottom, left, (0, 0, 255))
+                    self.show_labels(cv_img, "Unknown", top, right, bottom, left, (0, 0, 255))
                     self.detected_list = []
 
             if ret:
@@ -211,8 +166,7 @@ class VideoThread(QThread):
         # use the KNN model to find the best matches for the cv_img face
         closest_distances = model.kneighbors(faces_encodings,n_neighbors=5)
         face_distance = [closest_distances[0][i][0] for i in range(len(self.face_locations))][0]
-        # print("face_distance: ",face_distance)
-        accuracy = face_distance_to_conf(face_distance)
+        accuracy = self.face_distance_to_conf(face_distance)
         print(f"acc: {round(accuracy, 3)*100}%")
         print()
         # Using a lower threshold than 0.6 makes the face comparison more strict.
@@ -222,6 +176,43 @@ class VideoThread(QThread):
 
         # predict classes and remove classification that aren't within the threshold
         return [(pred, loc, acc) if rec else ("Unknown", loc, acc) for pred, loc, rec, acc in zip(model.predict(faces_encodings), self.face_locations, are_matches, [accuracy])]
+
+        # https://github.com/ageitgey/face_recognition/wiki/Calculating-Accuracy-as-a-Percentage
+    def face_distance_to_conf(self, face_distance, face_match_threshold=0.3):
+        if face_distance > face_match_threshold:
+            range = (1.0 - face_match_threshold)
+            linear_val = (1.0 - face_distance) / (range * 2.0)
+            return linear_val
+        else:
+            range = face_match_threshold
+            linear_val = 1.0 - (face_distance / (range * 2.0))
+            return linear_val + ((1.0 - linear_val) * math.pow((linear_val - 0.5) * 2, 0.2))
+
+    def show_labels(self, cv_img, name, top, right, bottom ,left, rec_color, acc=None):
+        top *= 4
+        right *= 4
+        bottom *= 4
+        left *= 4
+
+        # Draw a box around the face
+        cv2.rectangle(cv_img,(left-20,top-20),(right+20,bottom+20),(0,255,0),2)
+
+        # Draw a label with a name below the face
+        if name in self.remaining_students:
+            cv2.rectangle(cv_img, (left-20, bottom -15), (right+20, bottom+20), rec_color, cv2.FILLED)
+            cv2.putText(cv_img, f"{name} {round(acc,2)}", (left -20, bottom + 15), font, 1, (255, 255, 255), 2)
+        elif name == "Unknown":
+            cv2.rectangle(cv_img, (left-20, bottom -15), (right+20, bottom+20), rec_color, cv2.FILLED)
+            cv2.putText(cv_img, name, (left -20, bottom + 15), font, 1, (255, 255, 255), 2)
+
+    def take_attendance(self, name):
+        self.remaining_students.remove(name)
+        current_time = now.strftime("%H:%M:%S")
+
+        # Update the participants
+        self.date_ref.update({u'participants': firestore.ArrayUnion([name])})
+        self.labelStatus.setText("Status: Attended")
+        self.participants_list.append(name)
 
 class AttendanceSystem(QWidget):
     def __init__(self):
@@ -246,18 +237,19 @@ class AttendanceSystem(QWidget):
         # set the vbox layout as the widgets layout
         self.setLayout(vbox)
 
-        # create the video capture thread
-        self.thread = VideoThread()
-        # connect its signal to the update_image slot
-        self.thread.change_pixmap_signal.connect(self.update_image)
-        # start the thread
-        self.thread.start()
 
     def setClass(self, selectedDay, selectedClass, selectedClassInfo):
         self.selectedDay = selectedDay
         self.selectedClass = selectedClass
         self.selectedClassInfo = selectedClassInfo
         self.classInfo.setText(selectedClass + ' (' + selectedDay + ')')
+
+        # create the video capture thread
+        self.thread = VideoThread(selectedDay[:3], selectedClass, selectedClassInfo['students'], self.textLabelName, self.textLabelStatus)
+        # connect its signal to the update_image slot
+        self.thread.change_pixmap_signal.connect(self.update_image)
+        # start the thread
+        self.thread.start()
 
     @pyqtSlot(np.ndarray)
     def update_image(self, cv_img):
