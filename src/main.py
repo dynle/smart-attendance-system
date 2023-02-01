@@ -77,12 +77,13 @@ class VideoThread(QThread):
         self.remaining_students = student_list.copy()
         self.labelName = labelName
         self.labelStatus = labelStatus
+        self.participants_list = []
 
         self.date_ref = db.collection(day).document(class_name).collection('history').document(today)
         doc = self.date_ref.get()
-        self.participants_list = doc.to_dict()['participants']
 
         if doc.exists:
+            self.participants_list = doc.to_dict()['participants']
             self.remaining_students = [e for e in student_list if e not in self.participants_list]
         else:
             db.collection(day).document(class_name).collection('history').document(today).set({u'participants': []})
@@ -116,11 +117,15 @@ class VideoThread(QThread):
 
             for name, (top, right, bottom, left), acc in predictions:
                 print("- Found {} at ({}, {})".format(name, left, top))
+                print(self.detected_list)
                 self.labelName.setText(f"Name: {name}")
                 if name in self.participants_list:
                     self.labelStatus.setText("Status: Attended")
                 elif name not in self.student_list:
                     self.labelStatus.setText("Status: You are not taking this class!")
+                else:
+                    self.labelStatus.setText("Status: ")
+                
 
                 # Display results overlaid on cv_img in real-time
                 self.show_labels(cv_img, name, top, right, bottom, left, (255, 0, 0), acc)
