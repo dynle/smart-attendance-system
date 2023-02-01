@@ -59,8 +59,8 @@ detected_list = []
 result_flag = False
 
 # https://github.com/ageitgey/face_recognition/wiki/Calculating-Accuracy-as-a-Percentage
-# FIXME: Possible to use face_match_threshold = 0.3 when train the model with real people
-def face_distance_to_conf(face_distance, face_match_threshold=0.4):
+# IDEA: Possible to use face_match_threshold = 0.2 when train the model with real people
+def face_distance_to_conf(face_distance, face_match_threshold=0.2):
     if face_distance > face_match_threshold:
         range = (1.0 - face_match_threshold)
         linear_val = (1.0 - face_distance) / (range * 2.0)
@@ -91,9 +91,9 @@ def predict(rgb_small_frame, model):
 	print("face_distance: ",face_distance)
 	accuracy = face_distance_to_conf(face_distance)
 	print("acc: ",accuracy)
-	# FIXME: Possible to use distance_threshold = 0.3 when train the model with real people
+	# IDEA: Possible to use distance_threshold = 0.2 when train the model with real people
 	# Using a lower threshold than 0.6 makes the face comparison more strict.
-	distance_threshold = 0.4
+	distance_threshold = 0.2
 	are_matches = [closest_distances[0][i][0] <=
 				distance_threshold for i in range(len(face_locations))]
 
